@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { downloadBytes } from '../../lib/download';
+import { consumeLaunchFiles } from '../../lib/launchFiles';
 import { editPdf, mergePdfs, pageCount, parseRanges, type PageEdit } from './logic';
 import type { Thumbs } from './thumbs';
 
@@ -22,6 +23,11 @@ export default function PdfToolkit() {
   const [mode, setMode] = useState<Mode>('merge');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [launchedFile, setLaunchedFile] = useState<File | null>(null);
+
+  useEffect(() => consumeLaunchFiles('pdf-toolkit', (files) => {
+    if (files[0]) { setLaunchedFile(files[0]); setMode('pages'); }
+  }), []);
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -36,7 +42,7 @@ export default function PdfToolkit() {
         <button aria-pressed={mode === 'merge'} onClick={() => { setMode('merge'); setError(''); }}>Merge</button>
         <button aria-pressed={mode === 'pages'} onClick={() => { setMode('pages'); setError(''); }}>Split / reorder / rotate</button>
       </div>
-      {mode === 'merge' ? <Merge run={run} busy={busy} /> : <Pages run={run} busy={busy} />}
+      {mode === 'merge' ? <Merge run={run} busy={busy} /> : <Pages run={run} busy={busy} initialFile={launchedFile} />}
       {error && <p class="error" role="alert">{error}</p>}
     </>
   );
@@ -99,7 +105,7 @@ function Merge({ run, busy }: PanelProps) {
   );
 }
 
-function Pages({ run, busy }: PanelProps) {
+function Pages({ run, busy, initialFile }: PanelProps & { initialFile?: File | null }) {
   const [file, setFile] = useState<File | null>(null);
   const [data, setData] = useState<Uint8Array | null>(null);
   const [edits, setEdits] = useState<PageEdit[]>([]);
@@ -132,17 +138,20 @@ function Pages({ run, busy }: PanelProps) {
     } catch (e) { setRangeError(e instanceof Error ? e.message : String(e)); }
   };
 
+  const openFile = (f: File) => run(async () => {
+    const d = await readFile(f);
+    const n = await pageCount(d);
+    setFile(f); setData(d); openPreviews(d);
+    setEdits(Array.from({ length: n }, (_, index) => ({ index, rotate: 0, keep: true })));
+  });
+
+  useEffect(() => { if (initialFile) void openFile(initialFile); }, [initialFile]);
+
   return (
     <div class="card">
       <input type="file" accept="application/pdf" onChange={(e) => {
         const f = (e.target as HTMLInputElement).files?.[0];
-        if (!f) return;
-        run(async () => {
-          const d = await readFile(f);
-          const n = await pageCount(d);
-          setFile(f); setData(d); openPreviews(d);
-          setEdits(Array.from({ length: n }, (_, index) => ({ index, rotate: 0, keep: true })));
-        });
+        if (f) void openFile(f);
       }} />
       {data && file && (
         <>

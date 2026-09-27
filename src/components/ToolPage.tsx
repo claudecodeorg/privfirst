@@ -1,9 +1,11 @@
 import { lazy, Suspense } from 'preact/compat';
-import { useMemo } from 'preact/hooks';
+import { useEffect, useMemo } from 'preact/hooks';
 import type { Tool } from '../registry';
+import { pushRecent } from '../lib/usage';
 
 export function ToolPage({ tool }: { tool: Tool }) {
   const Component = useMemo(() => lazy(tool.load), [tool]);
+  useEffect(() => { pushRecent(tool.id); }, [tool.id]);
   return (
     <main class="container">
       <a class="back" href="#/">← All tools</a>

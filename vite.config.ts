@@ -54,6 +54,12 @@ export default defineConfig({
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
           { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        // Lets an installed desktop PWA appear in the OS "Open with" menu for these file types
+        // (Chrome/Edge only). src/lib/launchFiles.ts routes the opened file to the right tool.
+        file_handlers: [
+          { action: './#/pdf-toolkit', accept: { 'application/pdf': ['.pdf'] } },
+          { action: './#/image-compressor', accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg'], 'image/webp': ['.webp'] } },
+        ],
       },
       workbox: {
         // Precache every built asset (including lazy tool chunks) so all tools work offline.
