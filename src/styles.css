@@ -35,10 +35,12 @@ button.danger { color: var(--danger); }
 .stats div { background: var(--bg); border-radius: 10px; padding: 10px; }
 .stats b { display: block; font-size: 1.2rem; }
 .error { color: var(--danger); }
-.pages { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+.pages { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
 .page { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px; text-align: center; font-size: .85rem; }
 .page.off { opacity: .4; text-decoration: line-through; }
-.page .box { height: 80px; display: grid; place-items: center; font-size: 1.6rem; transition: transform .15s; }
+.page .box { height: 128px; display: grid; place-items: center; font-size: 1.6rem; overflow: hidden; }
+.page .box span { transition: transform .15s; }
+.page canvas { display: block; background: #fff; border-radius: 2px; box-shadow: 0 1px 4px rgba(0,0,0,.35); transition: transform .15s; }
 .page .acts { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
 .page .acts button { padding: 2px 8px; min-height: 32px; }
 .file-list { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 8px; }

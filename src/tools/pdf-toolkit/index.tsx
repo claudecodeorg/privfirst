@@ -1,6 +1,7 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { downloadBytes } from '../../lib/download';
 import { editPdf, mergePdfs, pageCount, parseRanges, type PageEdit } from './logic';
+import type { Thumbs } from './thumbs';
 
 type Mode = 'merge' | 'pages';
 
@@ -41,6 +42,36 @@ export default function PdfToolkit() {
   );
 }
 
+const BOX_W = 100;
+const BOX_H = 124;
+
+/** Renders one page preview on demand (when scrolled near the viewport); falls back to an icon if it can't. */
+function Thumb({ thumbs, index, rotate }: { thumbs: Thumbs | null; index: number; rotate: number }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const holder = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    if (!thumbs || !holder.current) return;
+    let live = true;
+    const start = () => thumbs.render(index, canvas.current!, BOX_W, BOX_H).then((s) => { if (live) setSize(s); }).catch(() => { /* keep the icon */ });
+    if (typeof IntersectionObserver === 'undefined') { start(); return () => { live = false; }; }
+    const io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) { io.disconnect(); start(); } }, { rootMargin: '300px' });
+    io.observe(holder.current);
+    return () => { live = false; io.disconnect(); };
+  }, [thumbs, index]);
+
+  const sideways = Math.abs(rotate) % 180 !== 0;
+  const fit = size && sideways ? Math.min(1, BOX_W / size.h, BOX_H / size.w) : 1; // keep a rotated page inside the tile
+  return (
+    <div class="box" ref={holder}>
+      {!size && <span style={`transform:rotate(${rotate}deg)`}>📄</span>}
+      <canvas ref={canvas} role="img" aria-label={`Preview of page ${index + 1}`}
+        style={size ? `width:${size.w}px;height:${size.h}px;transform:rotate(${rotate}deg) scale(${fit})` : 'display:none'} />
+    </div>
+  );
+}
+
 interface PanelProps { run: (fn: () => Promise<void>) => Promise<void>; busy: boolean }
 
 function Merge({ run, busy }: PanelProps) {
@@ -74,6 +105,21 @@ function Pages({ run, busy }: PanelProps) {
   const [edits, setEdits] = useState<PageEdit[]>([]);
   const [range, setRange] = useState('');
   const [rangeError, setRangeError] = useState('');
+  const [thumbs, setThumbs] = useState<Thumbs | null>(null);
+  const thumbsRef = useRef<Thumbs | null>(null);
+  const openId = useRef(0);
+
+  useEffect(() => () => { openId.current++; thumbsRef.current?.destroy(); }, []);
+
+  const openPreviews = (d: Uint8Array) => {
+    const id = ++openId.current;
+    thumbsRef.current?.destroy(); thumbsRef.current = null; setThumbs(null);
+    // Previews are optional: the page list works immediately and upgrades when pdf.js is ready.
+    import('./thumbs').then((m) => m.openThumbs(d)).then((t) => {
+      if (id !== openId.current) { t.destroy(); return; }
+      thumbsRef.current = t; setThumbs(t);
+    }).catch(() => { /* unsupported or encrypted: keep the icons */ });
+  };
 
   const update = (i: number, patch: Partial<PageEdit>) =>
     setEdits(edits.map((e, j) => (j === i ? { ...e, ...patch } : e)));
@@ -94,7 +140,7 @@ function Pages({ run, busy }: PanelProps) {
         run(async () => {
           const d = await readFile(f);
           const n = await pageCount(d);
-          setFile(f); setData(d);
+          setFile(f); setData(d); openPreviews(d);
           setEdits(Array.from({ length: n }, (_, index) => ({ index, rotate: 0, keep: true })));
         });
       }} />
@@ -111,7 +157,7 @@ function Pages({ run, busy }: PanelProps) {
           <div class="pages">
             {edits.map((e, i) => (
               <div class={`page${e.keep ? '' : ' off'}`} key={e.index}>
-                <div class="box" style={`transform:rotate(${e.rotate}deg)`}>📄</div>
+                <Thumb thumbs={thumbs} index={e.index} rotate={e.rotate} />
                 Page {e.index + 1}
                 <div class="acts">
                   <button aria-label="Move earlier" onClick={() => setEdits(move(edits, i, i - 1))}>←</button>

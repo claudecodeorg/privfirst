@@ -1,4 +1,6 @@
-import { defineConfig } from 'vite';
+import { readdirSync, readFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import { defineConfig, type Plugin } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -13,11 +15,29 @@ const cspPlugin = {
   ],
 };
 
+// pdf.js needs its standard-font data to draw text in PDFs that don't embed Helvetica/Times/Courier.
+// Served from our own origin so it works offline and under the CSP (connect-src 'self').
+const FONT_DIR = 'node_modules/pdfjs-dist/standard_fonts';
+const pdfFonts: Plugin = {
+  name: 'pdfjs-standard-fonts',
+  configureServer(server) {
+    server.middlewares.use('/standard_fonts', (req, res, next) => {
+      try { res.end(readFileSync(join(FONT_DIR, basename((req.url ?? '').split('?')[0])))); } catch { next(); }
+    });
+  },
+  generateBundle() {
+    for (const f of readdirSync(FONT_DIR).filter((n) => /\.(pfb|ttf)$/.test(n))) {
+      this.emitFile({ type: 'asset', fileName: `standard_fonts/${f}`, source: readFileSync(join(FONT_DIR, f)) });
+    }
+  },
+};
+
 export default defineConfig({
   base: './',
   plugins: [
     preact(),
     cspPlugin,
+    pdfFonts,
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
@@ -37,7 +57,7 @@ export default defineConfig({
       },
       workbox: {
         // Precache every built asset (including lazy tool chunks) so all tools work offline.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,pfb,ttf}'],
         navigateFallback: 'index.html',
       },
     }),

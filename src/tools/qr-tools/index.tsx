@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { downloadBlob } from '../../lib/download';
-import { decodeRgba, qrPngDataUrl, qrSvg, wifiPayload, type Ecc } from './logic';
+import { decodeRgba, qrPngBlob, qrSvg, wifiPayload, type Ecc } from './logic';
 
 type Mode = 'text' | 'wifi' | 'scan';
 
@@ -74,7 +74,7 @@ function Generate({ wifi }: { wifi: boolean }) {
         <>
           <div class="qr" role="img" aria-label="Generated QR code" dangerouslySetInnerHTML={{ __html: svg }} />
           <div class="row">
-            <button class="primary" onClick={async () => { const r = await fetch(await qrPngDataUrl(payload, ecc, 1024)); downloadBlob(await r.blob(), 'qr-code.png'); }}>Download PNG</button>
+            <button class="primary" onClick={async () => { try { downloadBlob(await qrPngBlob(payload, ecc, 1024), 'qr-code.png'); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } }}>Download PNG</button>
             <button onClick={() => downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'qr-code.svg')}>Download SVG</button>
           </div>
         </>
