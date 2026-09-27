@@ -55,6 +55,9 @@ export function Home() {
         {results.map((t) => <Tile t={t} key={t.id} />)}
       </div>
       {!results.length && <p class="muted center">No tools match “{q}”.</p>}
+      <footer class="muted center" style="margin-top:32px;font-size:.85rem">
+        <a href="privacy.html">Privacy Policy</a>
+      </footer>
     </main>
   );
 }

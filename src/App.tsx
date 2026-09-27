@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Home } from './components/Home';
+import { Paywall } from './components/Paywall';
 import { ToolPage } from './components/ToolPage';
 import { tools } from './registry';
 
@@ -18,5 +19,9 @@ function useHashRoute(): string {
 export function App() {
   const route = useHashRoute();
   const tool = tools.find((t) => t.id === route);
-  return tool ? <ToolPage key={tool.id} tool={tool} /> : <Home />;
+  return (
+    <Paywall>
+      {tool ? <ToolPage key={tool.id} tool={tool} /> : <Home />}
+    </Paywall>
+  );
 }
