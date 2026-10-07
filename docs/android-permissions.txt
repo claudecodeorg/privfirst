@@ -1,0 +1,3 @@
+android.permission.CAMERA
+com.android.vending.BILLING
+in.runhatlabs.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION

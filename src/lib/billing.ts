@@ -1,22 +1,17 @@
-// Paywall for the Android (Play Store) packaging only. The free web app is never gated: every check
-// here resolves to "unlocked" unless actually running inside the Trusted Web Activity that Google Play
-// Billing requires. See docs/android-publishing.md for how this fits together end to end.
+// Pure, dependency-free paywall logic for the Android (Play Store) native app only — no Capacitor
+// import here on purpose, so this stays trivially unit-testable in Node. The free web app is never
+// gated; see billing.native.ts (isGated) for how "native app" is actually detected, and
+// docs/android-publishing.md for how this all fits together end to end.
 
 export const LIFETIME_SKU = 'lifetime_access';
 export const TRIAL_MS = 24 * 60 * 60 * 1000;
 const TRIAL_START_KEY = 'privfirst.trialStart';
-const PLAY_BILLING_METHOD = 'https://play.google.com/billing';
-
-/** True only inside the packaged Android app, never in a normal browser tab — this is the standard,
- *  Google-documented way a TWA-hosted page tells itself apart from the same site opened in Chrome. */
-export function isTWA(referrer: string = typeof document !== 'undefined' ? document.referrer : ''): boolean {
-  return referrer.startsWith('android-app://');
-}
+const ENTITLED_CACHE_KEY = 'privfirst.entitledCache';
 
 export type AccessState = 'free' | 'trial' | 'expired' | 'purchased';
 
-export function getAccessState(opts: { inTwa: boolean; entitled: boolean; now: number; trialStart: number }): AccessState {
-  if (!opts.inTwa) return 'free'; // the web app is always free; only the packaged app is ever gated
+export function getAccessState(opts: { gated: boolean; entitled: boolean; now: number; trialStart: number }): AccessState {
+  if (!opts.gated) return 'free'; // the web app is always free; only the native Android app is ever gated
   if (opts.entitled) return 'purchased';
   return opts.now - opts.trialStart < TRIAL_MS ? 'trial' : 'expired';
 }
@@ -39,31 +34,16 @@ export function getOrInitTrialStart(now: number = Date.now()): number {
   return now;
 }
 
-interface DigitalGoodsService { listPurchases(): Promise<{ itemId: string }[]> }
-declare global { interface Window { getDigitalGoodsService?(paymentMethod: string): Promise<DigitalGoodsService> } }
-
-/** Asks Google Play (via the Digital Goods API) whether this Google account already owns the lifetime SKU. */
-export async function checkEntitlement(): Promise<boolean> {
-  if (typeof window === 'undefined' || !window.getDigitalGoodsService) return false;
-  try {
-    const service = await window.getDigitalGoodsService(PLAY_BILLING_METHOD);
-    const purchases = await service.listPurchases();
-    return purchases.some((p) => p.itemId === LIFETIME_SKU);
-  } catch { return false; }
+/** There is no backend, so once Play confirms a purchase this is the only record of it. Checked
+ *  again on every launch (see checkEntitlement in billing.native.ts); only trusted directly when
+ *  that live check can't run at all, e.g. offline. */
+export function getCachedEntitlement(): boolean {
+  return getStore()?.getItem(ENTITLED_CACHE_KEY) === '1';
 }
 
-/** Launches the Play Billing purchase sheet for the lifetime SKU. Resolves true only on a completed purchase. */
-export async function purchaseLifetime(): Promise<boolean> {
-  if (typeof PaymentRequest === 'undefined') return false;
-  const request = new PaymentRequest(
-    [{ supportedMethods: PLAY_BILLING_METHOD, data: { sku: LIFETIME_SKU } }],
-    { total: { label: 'PrivFirst lifetime access', amount: { currency: 'USD', value: '1.00' } } },
-  );
-  try {
-    const response = await request.show();
-    await response.complete('success');
-    return true;
-  } catch {
-    return false;
-  }
+export function setCachedEntitlement(entitled: boolean): void {
+  const store = getStore();
+  if (!store) return;
+  if (entitled) store.setItem(ENTITLED_CACHE_KEY, '1');
+  else store.removeItem(ENTITLED_CACHE_KEY); // e.g. Play reports a refund on next live check
 }

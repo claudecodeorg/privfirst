@@ -32,13 +32,46 @@ const pdfFonts: Plugin = {
   },
 };
 
+// Native Android (Capacitor) builds bundle all assets into the app itself, so a service worker /
+// precache would just be redundant (and the PWA's own update mechanism makes no sense inside a
+// native shell that updates via Play Store app updates instead).
+const isCapBuild = process.env.CAP_BUILD === '1';
+
+// src/lib/billing.mock.ts is a dev-only harness for exercising Paywall UI states (?mockBilling=...)
+// without a real device. It must never ship in a release build (web or native) — relying on the
+// minifier's dead-code elimination to drop it turned out NOT to hold (verified empirically: a
+// `import.meta.env.DEV`-gated dynamic import of it still produced a reachable chunk in the output).
+// This plugin instead deterministically swaps it for an inert stub for any `vite build`, so its
+// absence doesn't depend on bundler internals. scripts/check-no-mock-in-release.mjs re-verifies it.
+const stripMockBilling: Plugin = {
+  name: 'strip-mock-billing-in-build',
+  apply: 'build',
+  enforce: 'pre',
+  resolveId(source, importer) {
+    if (importer && /\/billing\.native\.ts$/.test(importer) && /\.\/billing\.mock$/.test(source)) {
+      return '\0virtual:billing-mock-stub';
+    }
+  },
+  load(id) {
+    if (id === '\0virtual:billing-mock-stub') {
+      return [
+        'export function readMockState() { return null; }',
+        'export function mockQueryPurchases() { return { owned: false }; }',
+        'export function mockProductDetails() { return { found: false }; }',
+        'export function mockPurchase() { return { status: "error" }; }',
+      ].join('\n');
+    }
+  },
+};
+
 export default defineConfig({
   base: './',
   plugins: [
     preact(),
     cspPlugin,
     pdfFonts,
-    VitePWA({
+    stripMockBilling,
+    ...(isCapBuild ? [] : [VitePWA({
       registerType: 'autoUpdate',
       manifest: {
         name: 'PrivFirst',
@@ -66,7 +99,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,pfb,ttf}'],
         navigateFallback: 'index.html',
       },
-    }),
+    })]),
   ],
   build: { target: 'es2022' },
 });

@@ -1,5 +1,7 @@
+import { Capacitor } from '@capacitor/core';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { downloadBlob } from '../../lib/download';
+import { PermRelease } from '../../lib/nativePlugins';
 import { decodeRgba, qrPngBlob, qrSvg, wifiPayload, type Ecc } from './logic';
 
 type Mode = 'text' | 'wifi' | 'scan';
@@ -127,12 +129,19 @@ function Scan() {
         tick();
       } catch { setError('Camera unavailable or permission denied. You can scan from an image instead.'); setCamera(false); }
     })();
-    return () => { stop = true; stream?.getTracks().forEach((t) => t.stop()); };
+    return () => {
+      stop = true;
+      stream?.getTracks().forEach((t) => t.stop());
+      // On Android 13+, give up the CAMERA permission grant as soon as scanning stops, instead of
+      // holding it for the rest of the app's life. No-op on web and on older Android.
+      if (Capacitor.isNativePlatform()) void PermRelease.releaseCamera();
+    };
   }, [camera]);
 
   const isUrl = /^https?:\/\//i.test(result);
   return (
     <div class="card">
+      {!camera && <p class="muted">Scanning with the camera asks for camera access just for this. It's released again as soon as you stop.</p>}
       <div class="row">
         <button class="primary" onClick={() => { setError(''); setResult(''); setCamera(!camera); }}>{camera ? 'Stop camera' : 'Scan with camera'}</button>
         <label style="flex:0 0 auto"><span class="btn">Scan from image…</span>

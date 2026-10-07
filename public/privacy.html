@@ -17,11 +17,12 @@
 <body>
 <main>
   <h1>PrivFirst — Privacy Policy</h1>
-  <p class="muted">Last updated: 2026-09-27</p>
+  <p class="muted">Last updated: 2026-10-07</p>
 
   <p>PrivFirst is a suite of utilities (PDF tools, image tools, encrypted notes, developer tools, and
   calculators) that run entirely on your device, in your browser. This policy applies to the PrivFirst
-  web app and to the PrivFirst Android app, which is the same web app packaged for the Play Store.</p>
+  web app and to the PrivFirst Android app, which packages the same code as a native app with no
+  server and no internet access of its own (see "App permissions" below).</p>
 
   <h2>What we collect</h2>
   <p><strong>Nothing.</strong> PrivFirst has no server, no analytics, no crash reporting, and no user
@@ -42,15 +43,34 @@
   permanently.</p>
 
   <h2>Camera access</h2>
-  <p>The QR code scanner asks for camera access to scan a code. Camera frames are processed locally and
-  are never recorded, stored or transmitted.</p>
+  <p>The QR code scanner asks for camera access only when you tap "Scan with camera" — scanning from an
+  existing image never requires it. Camera frames are processed locally and are never recorded, stored
+  or transmitted. On Android, the permission is requested at that moment (never at install or launch)
+  and the app gives it up again as soon as you stop scanning.</p>
+
+  <h2>App permissions (Android app only)</h2>
+  <p>The Android app requests no internet permission and no storage or media permission — it cannot
+  make network requests, read your files, or access photos/media on your device, even in principle.
+  It requests only:</p>
+  <ul>
+    <li><strong>Camera</strong> — only for the optional live QR scan described above, and only while
+      scanning. The app installs and works fully without ever granting this.</li>
+    <li><strong>A one-time-purchase billing permission</strong> — lets the app talk to the Google Play
+      Store app on your device for the single in-app purchase described below. This does not grant
+      network access; it works only with the Play Store app already installed on your device.</li>
+  </ul>
+  <p>Saving a file (a PDF, an image, etc.) uses Android's standard "Save As" file picker, which needs no
+  storage permission.</p>
 
   <h2>Purchases (Android app only)</h2>
   <p>The Android app offers a one-time "lifetime access" purchase after a one-day free trial, handled
   entirely by Google Play Billing. We do not receive your payment details. Google's handling of payment
   information is covered by
   <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google's Privacy Policy</a>.
-  The free web version at this same address is not affected by this and remains free and unrestricted.</p>
+  There is no server of ours involved in this purchase: your purchase status is checked directly against
+  Google Play each time you open the app, and cached on your device so the app keeps working offline
+  after you've bought it. The free web version at this same address is not affected by this and remains
+  free and unrestricted.</p>
 
   <h2>Third parties</h2>
   <p>PrivFirst does not use any third-party analytics, advertising, or tracking services.</p>

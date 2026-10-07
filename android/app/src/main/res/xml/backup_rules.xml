@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- allowBackup is already false, but this is belt-and-suspenders: exclude everything from any
+     backup path (old-style Auto Backup) too, since localStorage holds the Encrypted Notes vault. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="external" path="." />
+    <exclude domain="root" path="." />
+</full-backup-content>
