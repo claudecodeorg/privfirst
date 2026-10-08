@@ -1,6 +1,7 @@
 package `in`.runhatlabs.app
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.result.ActivityResult
@@ -47,11 +48,16 @@ class SaveFilePlugin : Plugin() {
             type = mimeType
             putExtra(Intent.EXTRA_TITLE, name)
         }
-        if (createIntent.resolveActivity(context.packageManager) == null) {
+        try {
+            // Deliberately not pre-checking createIntent.resolveActivity() first: on Android 11+,
+            // that query is itself subject to package-visibility filtering and ACTION_CREATE_DOCUMENT
+            // is not on the automatic-exemption list, so it unreliably reports "no picker available"
+            // even when one exists — which would silently force every save onto the share-sheet
+            // fallback below. Just try to launch it and fall back only on an actual failure.
+            startActivityForResult(call, createIntent, "handleSaveResult")
+        } catch (_: ActivityNotFoundException) {
             shareInstead(call, sourceFile, mimeType)
-            return
         }
-        startActivityForResult(call, createIntent, "handleSaveResult")
     }
 
     @ActivityCallback

@@ -32,7 +32,12 @@ const CHUNK_BYTES = 1024 * 1024;
 
 async function saveNative(blob: Blob, name: string) {
   const bytes = new Uint8Array(await blob.arrayBuffer());
-  const cachePath = `save-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  // Keeps the real filename's extension on the cache file itself: the SAF save dialog below uses
+  // `name` directly and doesn't care, but the share-sheet fallback (rare — only when no document
+  // picker is available at all) exposes this cache file's actual on-disk name to the receiving
+  // app, so an extension-less name there would show up as an unrecognized file type.
+  const safeName = name.replace(/[^A-Za-z0-9._-]/g, '_');
+  const cachePath = `save-${Date.now()}-${Math.random().toString(36).slice(2)}-${safeName}`;
   await Filesystem.writeFile({ path: cachePath, data: '', directory: Directory.Cache, recursive: true });
   for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
     const slice = bytes.subarray(offset, offset + CHUNK_BYTES);
