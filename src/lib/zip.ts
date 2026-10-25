@@ -22,32 +22,46 @@ const u16 = (v: number) => [v & 0xff, (v >>> 8) & 0xff];
 const u32 = (v: number) => [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff];
 const DOS_TIME = 0, DOS_DATE = 0x21; // 1980-01-01: fine for a downloaded bundle, no real mtime to leak
 
+// Spreading a large Uint8Array (e.g. `...data`) into an array literal or push() blows the call
+// stack past tens of thousands of elements, which real photos/PDF-page renders exceed easily.
+// Concatenate with set() instead — it's iterative, not recursive, so size doesn't matter.
+function concatBytes(parts: (number[] | Uint8Array)[]): Uint8Array {
+  let total = 0;
+  for (const p of parts) total += p.length;
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const p of parts) { out.set(p, offset); offset += p.length; }
+  return out;
+}
+
 export function zipStore(entries: ZipEntry[]): Uint8Array {
   const enc = new TextEncoder();
-  const locals: number[] = [];
-  const central: number[] = [];
+  const localParts: Uint8Array[] = [];
+  const centralParts: Uint8Array[] = [];
   let offset = 0;
   for (const { name, data } of entries) {
-    const nameBytes = [...enc.encode(name)];
+    const nameBytes = enc.encode(name);
     const crc = crc32(data);
-    const local = [
-      ...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0), ...u16(DOS_TIME), ...u16(DOS_DATE),
-      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameBytes.length), ...u16(0),
-      ...nameBytes, ...data,
-    ];
-    locals.push(...local);
-    central.push(
-      ...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(DOS_TIME), ...u16(DOS_DATE),
-      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameBytes.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
-      ...u32(0), ...u32(offset), ...nameBytes,
-    );
+    const localHeader = concatBytes([
+      u32(0x04034b50), u16(20), u16(0), u16(0), u16(DOS_TIME), u16(DOS_DATE),
+      u32(crc), u32(data.length), u32(data.length), u16(nameBytes.length), u16(0),
+      nameBytes,
+    ]);
+    const local = concatBytes([localHeader, data]);
+    localParts.push(local);
+    centralParts.push(concatBytes([
+      u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(DOS_TIME), u16(DOS_DATE),
+      u32(crc), u32(data.length), u32(data.length), u16(nameBytes.length), u16(0), u16(0), u16(0), u16(0),
+      u32(0), u32(offset), nameBytes,
+    ]));
     offset += local.length;
   }
-  const end = [
-    ...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(entries.length), ...u16(entries.length),
-    ...u32(central.length), ...u32(offset), ...u16(0),
-  ];
-  return Uint8Array.from([...locals, ...central, ...end]);
+  const central = concatBytes(centralParts);
+  const end = concatBytes([
+    u32(0x06054b50), u16(0), u16(0), u16(entries.length), u16(entries.length),
+    u32(central.length), u32(offset), u16(0),
+  ]);
+  return concatBytes([...localParts, central, end]);
 }
 
 /** Reads back a zip written by `zipStore` (STORE entries only, read in local-header order). */
