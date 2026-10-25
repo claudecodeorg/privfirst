@@ -15,7 +15,7 @@ export async function pageCount(data: Uint8Array): Promise<number> {
 export async function mergePdfs(files: Uint8Array[]): Promise<Uint8Array> {
   const out = await PDFDocument.create();
   for (const data of files) {
-    const src = await PDFDocument.load(data);
+    const src = await PDFDocument.load(data, { ignoreEncryption: true });
     const pages = await out.copyPages(src, src.getPageIndices());
     pages.forEach((p) => out.addPage(p));
   }
@@ -24,7 +24,7 @@ export async function mergePdfs(files: Uint8Array[]): Promise<Uint8Array> {
 
 /** Builds a new PDF from `edits`, in order, skipping pages marked `keep: false`. */
 export async function editPdf(data: Uint8Array, edits: PageEdit[]): Promise<Uint8Array> {
-  const src = await PDFDocument.load(data);
+  const src = await PDFDocument.load(data, { ignoreEncryption: true });
   const out = await PDFDocument.create();
   const kept = edits.filter((e) => e.keep);
   if (!kept.length) throw new Error('Keep at least one page.');
