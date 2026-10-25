@@ -23,4 +23,13 @@ describe('zipStore / unzipStore', () => {
     const zip = zipStore([{ name: 'x', data: new Uint8Array([1, 2, 3]) }]);
     expect(new DataView(zip.buffer).getUint32(0, true)).toBe(0x04034b50);
   });
+  it('handles entries far larger than the JS spread/argument-list limit (~65k elements)', () => {
+    const big = new Uint8Array(200_000);
+    for (let i = 0; i < big.length; i++) big[i] = i & 255;
+    const entries = [{ name: 'big.bin', data: big }];
+    const back = unzipStore(zipStore(entries));
+    expect(back).toHaveLength(1);
+    expect(back[0].data.length).toBe(big.length);
+    expect(back[0].data.every((v, i) => v === big[i])).toBe(true);
+  });
 });
