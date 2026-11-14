@@ -1,6 +1,6 @@
 import type { ComponentType } from 'preact';
 
-export type Category = 'Documents' | 'Privacy' | 'Images' | 'Developer' | 'Everyday';
+export type Category = 'Documents' | 'Privacy' | 'Images' | 'Developer' | 'Everyday' | 'Productivity';
 
 export interface Tool {
   id: string;
@@ -254,9 +254,17 @@ export const tools: Tool[] = [
     keywords: ['time zone', 'timezone', 'meeting', 'world clock', 'cities', 'schedule'],
     load: () => import('./tools/timezone-planner'),
   },
+  {
+    id: 'zip-splitter',
+    name: 'Zip Splitter & Merger',
+    description: 'Bundles files into size-capped zip archives (for email or upload limits), or merges several zips back into one.',
+    icon: '📦', category: 'Productivity',
+    keywords: ['zip', 'split', 'merge', 'combine', 'archive', 'bin pack', 'email attachment', 'upload limit', 'size limit', 'bundle'],
+    load: () => import('./tools/zip-splitter'),
+  },
 ];
 
-export const categories: Category[] = ['Documents', 'Privacy', 'Images', 'Developer', 'Everyday'];
+export const categories: Category[] = ['Documents', 'Privacy', 'Images', 'Developer', 'Everyday', 'Productivity'];
 
 export function searchTools(query: string, category?: Category | null): Tool[] {
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
