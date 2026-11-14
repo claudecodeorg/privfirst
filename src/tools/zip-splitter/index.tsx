@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { downloadBlob, formatBytes } from '../../lib/download';
 import { unzipStore, zipStore, type ZipEntry } from '../../lib/zip';
-import { dedupeNames, planBins } from './logic';
+import { dedupeNames, expandForSlicing, planBins, reassembleSlices } from './logic';
 
 type Mode = 'split' | 'merge';
 const remove = <T,>(arr: T[], i: number): T[] => arr.filter((_, j) => j !== i);
@@ -11,7 +11,7 @@ export default function ZipSplitter() {
   const [mode, setMode] = useState<Mode>('split');
   return (
     <>
-      <p class="muted">Bundles files into zip archives capped at a size you choose (handy for email or upload limits), or merges several zips back into one.</p>
+      <p class="muted">Bundles files into zip archives capped at a size you choose (handy for email or upload limits). A single file bigger than the limit is cut into numbered parts across zips — use Merge zips to put everything back together, including those parts.</p>
       <div class="tabs" role="group" aria-label="Mode">
         <button aria-pressed={mode === 'split'} onClick={() => setMode('split')}>Split into zips</button>
         <button aria-pressed={mode === 'merge'} onClick={() => setMode('merge')}>Merge zips</button>
@@ -35,18 +35,27 @@ function Split() {
     try {
       const thresholdBytes = Math.round(maxMb * 1024 * 1024);
       const infos = files.map((f) => ({ name: f.name, size: f.size }));
-      const { bins, oversized } = planBins(infos, thresholdBytes);
+      // A file bigger than the threshold on its own gets sliced into numbered parts first
+      // (expandForSlicing), so it still ends up split across multiple zips instead of one
+      // oversized zip. `items`/`sources` stay index-aligned: sources[i] is the byte range of
+      // files[sources[i].fileIndex] that items[i] actually is.
+      const { items, sources } = expandForSlicing(infos, thresholdBytes);
+      const { bins, oversized } = planBins(items, thresholdBytes);
       if (oversized.length) {
-        setWarning(`${oversized.map((i) => files[i].name).join(', ')} ${oversized.length === 1 ? 'is' : 'are'} bigger than the threshold on its own, so that zip will go over it.`);
+        setWarning(`${oversized.map((i) => items[i].name).join(', ')} ${oversized.length === 1 ? 'is' : 'are'} bigger than the threshold even alone, so that zip will go over it.`);
       }
       const pad = String(bins.length).length;
       const base = archiveName.trim() || 'archive';
       for (let b = 0; b < bins.length; b++) {
         const bin = bins[b];
-        setProgress(`Zipping part ${b + 1} of ${bins.length} (${bin.length} file${bin.length === 1 ? '' : 's'})…`);
-        const names = dedupeNames(bin.map((i) => files[i].name));
+        setProgress(`Zipping part ${b + 1} of ${bins.length} (${bin.length} item${bin.length === 1 ? '' : 's'})…`);
+        const names = dedupeNames(bin.map((i) => items[i].name));
         const entries: ZipEntry[] = await Promise.all(
-          bin.map(async (i, j) => ({ name: names[j], data: new Uint8Array(await files[i].arrayBuffer()) })),
+          bin.map(async (i, j) => {
+            const src = sources[i];
+            const data = new Uint8Array(await files[src.fileIndex].slice(src.start, src.end).arrayBuffer());
+            return { name: names[j], data };
+          }),
         );
         const zip = zipStore(entries);
         const part = String(b + 1).padStart(pad, '0');
@@ -99,8 +108,9 @@ function Merge() {
         if (!entries.length) throw new Error(`"${file.name}" doesn't look like a valid zip file.`);
         allEntries.push(...entries);
       }
-      const names = dedupeNames(allEntries.map((e) => e.name));
-      const merged = zipStore(allEntries.map((e, i) => ({ name: names[i], data: e.data })));
+      const reassembled = reassembleSlices(allEntries);
+      const names = dedupeNames(reassembled.map((e) => e.name));
+      const merged = zipStore(reassembled.map((e, i) => ({ name: names[i], data: e.data })));
       downloadBlob(new Blob([merged as BlobPart], { type: 'application/zip' }), 'merged.zip');
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }

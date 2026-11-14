@@ -25,7 +25,7 @@ const DOS_TIME = 0, DOS_DATE = 0x21; // 1980-01-01: fine for a downloaded bundle
 // Spreading a large Uint8Array (e.g. `...data`) into an array literal or push() blows the call
 // stack past tens of thousands of elements, which real photos/PDF-page renders exceed easily.
 // Concatenate with set() instead — it's iterative, not recursive, so size doesn't matter.
-function concatBytes(parts: (number[] | Uint8Array)[]): Uint8Array {
+export function concatBytes(parts: (number[] | Uint8Array)[]): Uint8Array {
   let total = 0;
   for (const p of parts) total += p.length;
   const out = new Uint8Array(total);
